@@ -184,8 +184,9 @@ def scatter_comparison(genes_queried: list, genes_liste:list, col2):
         genes_list: list
         cols2: st.tabs.cols
     """
+    #this removes the duplicated
     genes_queried = genes_queried.groupby(level=0)
-    genes_queried = genes_queried.last()
+    genes_queried = genes_queried.last() # this retrieves the last value per group
     genes_queried = genes_queried.T
 
     # retrieve the max and minimum values
@@ -209,7 +210,6 @@ def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
     Draws the correlation matrix form the selected data
     Args:
         genes_queried: list -> list of selected genes
-
     """
 
     corrMatrix = prepare_correlation_matrix(genes_queried)
@@ -428,7 +428,7 @@ def lnc_query_genes(genes_liste, con, tab):
     tab.altair_chart(fig, use_container_width = True)
 
 
-def make_heatmap(df_curves: pd.DataFrame, timepoint: str, title: str = None):
+def make_heatmap(df_curves,  gene_name, value, timepoint, title = None):
     """_summary_
 
     Args:
