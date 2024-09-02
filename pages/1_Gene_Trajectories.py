@@ -28,30 +28,27 @@ def trajectory_start():
 
     """
     con = load_data()
-    st.header("Expression Signatures of iPSC-derived sensory Neuron (iDNs)")
+    st.header("Expression Signatures of iPSC-derived sensory Neuron")
     tab1, tab2, tab3, tab4 = st.tabs(["mRNA and miRNA Trajectories",
                                       "miRNA with Multimapper",
                                       "ncRNA Trajectories (Excerpt)",
                                       "lncRNA Trajectories"])
 
     selected_draw, mirna_select,nc_select, lnc_select = execute_fill_list(con)
-
-    tab1.write("---")
     #retrieve the genes for selection for searching
-    gene_queried = tab1.multiselect("Select Gene:", selected_draw)
+    gene_queried = tab1.multiselect("Select Genes for Temporal Analysis:", selected_draw)
     tab1.write("---")
 
     #retrieve the mirnas for selection for searching
     mirna_select = sorted(list(set(mirna_select)))
-    mirna_queried = tab2.multiselect("Select miRNA: ", mirna_select)
+    mirna_queried = tab2.multiselect("Select miRNAs for temporal Analysis: ", mirna_select)
     tab2.write("---")
-    #ncRNA
-    nc_queried = tab3.multiselect("Select ncRNA: ", nc_select)
+    nc_queried = tab3.multiselect("Select ncRNAs for temporal Analysis: ", nc_select)
     tab3.write("---")
-    lnc_queried = tab4.multiselect("Select lncRNA: ", lnc_select["external_gene_name"].tolist())
+    lnc_queried = tab4.multiselect("Select lncRNAs for temporal Analysis: ", lnc_select["external_gene_name"].tolist())
+    tab4.write("---")
 
     # here the layout of the sidebar should be added
-
     if gene_queried:
         preprocess_tpm_vsd(gene_queried,con,tab1)
 
@@ -88,13 +85,13 @@ def preprocess_tpm_vsd(genes_liste: list,con: duckdb, tab: st.tabs) -> None:
         if len(df_curves["Gene Name"].unique()) <= 5:
             make_trajectories(df_curves, tpm_curves, tab)
         else:
-            fig = make_heatmap(df_curves, "Gene Name", "z-scored variance stabilized counts", "Timepoint", title = "Gene Signatures")
+            fig = make_heatmap(df_curves, "Gene Name", "z-scored variance stabilized counts", "Timepoint", title = "Temporal Signatures")
             tab.altair_chart(fig, use_container_width = True)
 
     elif len(df_curves["Gene Name"].unique()) <= 5:
         make_trajectories(df_curves, None, tab)
     else:
-        fig = make_heatmap(df_curves, "Gene Name", "z-scored variance stabilized counts", "Timepoint", title = "Gene Signatures")
+        fig = make_heatmap(df_curves, "Gene Name", "z-scored variance stabilized counts", "Timepoint", title = "Temporal Signatures")
         tab.altair_chart(fig, use_container_width = True)
 
 
@@ -166,7 +163,13 @@ def cell_line_specific_printing(df_curves,metadata_table, col1):
         col1: st.tabs.col --> tab and column where this figure should be drawn
     """
 
-    cell_select = st.sidebar.selectbox("Select Cell-Line:", ["AD2","AD3","840"])
+    col1.markdown("Explore cell line specific trajectories:")
+    cell_select = st.radio(
+    "Select Cell-Line",
+    ["AD2","AD3","840"],
+    index=0,
+    horizontal = True
+            )
     selected_table = df_curves[df_curves["cell_line"] == cell_select]
 
     if len(selected_table["Gene Name"].unique()) <= 5:
@@ -174,7 +177,6 @@ def cell_line_specific_printing(df_curves,metadata_table, col1):
     else:
         fig = make_heatmap(selected_table, "Gene Name", "z-scored variance stabilized counts", "Timepoint","Cell-Type specific Signatures")
     col1.altair_chart(fig, use_container_width = True)
-    st.sidebar.markdown("---")
 
 def scatter_comparison(genes_queried: list, genes_liste:list, col2):
     # sourcery skip: avoid-builtin-shadow
@@ -202,6 +204,7 @@ def scatter_comparison(genes_queried: list, genes_liste:list, col2):
                                     orient='bottom').configure_axis(grid = False,
                                                                       labelFontSize = 13).configure_view(strokeOpacity = 0)
     #final_figure = fig + fig.transform_regression(str(genes_liste[0]),str(genes_liste[1])).mark_line()
+    col2.markdown("Correlation Analysis of the two selected genes")
     col2.altair_chart(final, use_container_width = True)
 
 
@@ -217,10 +220,6 @@ def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
     x=alt.X('var1', title=None),
     y=alt.Y('var2', title=None),
     color=alt.Color('correlation', legend=None),
-                    ).properties(
-                        width=alt.Step(40),
-                        height=alt.Step(40),
-                        title = "Correlation Matrix"
                     )
 
     chart += chart.mark_text(size=12).encode(
@@ -231,6 +230,7 @@ def correlation_matrix_analysis(genes_queried: list, genes_liste:list, col2):
             alt.value('black')
         )
     )
+    col2.markdown("Correlation Matrix of all selected genes:")
     col2.altair_chart(chart, use_container_width = True)
 
 def prepare_correlation_matrix(genes_queried: list):
@@ -272,6 +272,7 @@ def make_trajectories(df_curves: pd.DataFrame, tpm_curves: pd.DataFrame = None, 
     else:
         st.markdown("---")
         vsd_figure = draw_altair_graph(df_curves,"z-scored variance stabilized counts", "Gene Name", "Time aggregated")
+        col1.markdown("Temporal Trajectories of Variance Stabilized Counts")
         col1.altair_chart(vsd_figure, use_container_width = True)
         col2.warning("No Data found for TPM here!")
 
@@ -287,7 +288,9 @@ def draw_trajectories(tpm_curves: pd.DataFrame,
     tpm_figure = draw_altair_graph(tpm_curves, "TPM (Transcript per Million)","Gene Name")
     # write the figure into the ap
     col1.empty()
+    col1.markdown("Temporal Trajectories of Variance Stabilized Counts")
     col1.altair_chart(vsd_figure,use_container_width = True)
+    col2.markdown("Temporal Trajectories of Transcripts per Millions")
     col2.altair_chart(tpm_figure,use_container_width= True)
 
 def mirna_multimap_drawing(searched_mirna, con,tab):

@@ -10,8 +10,27 @@ import holoviews as hv
 from holoviews import opts, dim
 import requests
 import duckdb
+import logging
+# Create a logger
+logger = logging.getLogger('my_logger')
 
+# Set the level of the logger. This can be DEBUG, INFO, WARNING, ERROR, or CRITICAL
+logger.setLevel(logging.DEBUG)
+
+# Create a stream handler for the logger
+stream_handler = logging.StreamHandler()
+
+# Create a formatter
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Set the formatter for the stream handler
+stream_handler.setFormatter(formatter)
+
+# Add the stream handler to the logger
+logger.addHandler(stream_handler)
 hv.extension('bokeh', logo=False) #draw interactive visualization using holoviews
+
+
 
 @st.cache_resource
 def load_data():
@@ -41,12 +60,16 @@ def kegg_disease_analysis():
 
     st.sidebar.info("Please select you KEGG/Disease pathway or the miRNA of interest to derive enriched genes throughout iPSC-derived sensory neuron development")
 
-    make_chart(resulting_gene_list,
-               con,
-               statistics = statistics,
-               p_value = p_value,
-               tab = tab1
-               )
+    try:
+        make_chart(resulting_gene_list,
+                con,
+                statistics = statistics,
+                p_value = p_value,
+                tab = tab1
+                )
+    except KeyError:
+        tab1.warning("Not enough genes to construct target network")
+        return None
 
 
     # also evaluate the disease gene interaction
@@ -66,17 +89,32 @@ def kegg_disease_analysis():
 def run_disease_analysis(con,diesase_selected, show_labels, super_cluster_statistics, super_cluster_counts, tab):
 
     if tab.button("Start Analysis:"):
-        disease_genes = con.execute(f"Select geneSymbol from diseases WHERE diseaseName='{diesase_selected}'").fetchnumpy()["geneSymbol"].tolist()
+
+        try:
+            disease_genes = con.execute(
+                                "SELECT geneSymbol FROM diseases WHERE diseaseName=?", 
+                                (diesase_selected,)
+                            ).fetchnumpy()["geneSymbol"].tolist()
+        except Exception as e:
+            logger.error(e)
+            tab.warning("Disease currently not found")
+            return None
+
         #disease_genes = dataframe_dictionary["disease"][dataframe_dictionary["disease"]["diseaseName"] == diesase_selected]["geneSymbol"].unique()
         disstats, dis_pval = gene_set_kegg_enrichment(disease_genes, super_cluster_statistics,
                                                 super_cluster_counts)
-        make_chart(disease_genes,con,
-                statistics = disstats,
-                p_value = dis_pval,
-                tab = tab,
-                checkbox = show_labels,
-                threshold = 0.95
-                )
+
+        try:
+            make_chart(disease_genes,con,
+                    statistics = disstats,
+                    p_value = dis_pval,
+                    tab = tab,
+                    checkbox = show_labels,
+                    threshold = 0.95
+                    )
+        except KeyError:
+            tab.warning("Not enough gene names found here with interaction score > 0.95 found!")
+            return None
 
 
 
@@ -369,13 +407,17 @@ def get_mirna_information(mirna, con, target_score, tab):
     #check how lenghty the genes list
     if len(mirna_target_genes) > 10:
 
-        make_chart(mirna_target_genes,con,
-                   disease_mirna = None,
-                   mirna = True,
-                   statistics = statistics,
-                   p_value = float(p_value),
-                   mirna_name = mirna,
-                   tab = tab)
+        try:
+            make_chart(mirna_target_genes,con,
+                    disease_mirna = None,
+                    mirna = True,
+                    statistics = statistics,
+                    p_value = float(p_value),
+                    mirna_name = mirna,
+                    tab = tab)
+        except KeyError:
+            tab.warning("No enough targets found, to draw the plot")
+            return None
     else:
         #else the number of targets is to loo
         tab.warning("Try different settings or a different miRNA, the number of miRNA targets is to low")
